@@ -188,7 +188,7 @@ button.action.success:hover { background: #34c759; }
 .explanation .label { font-weight: 600; color: #1f3a68; }
 .explanation .ans-correct { color: #28a745; font-weight: 600; }
 .explanation .ans-wrong { color: #dc3545; font-weight: 600; }
-.explanation pre {
+.explanation .explain-text {
   background: #fff;
   padding: 8px 10px;
   border-radius: 4px;

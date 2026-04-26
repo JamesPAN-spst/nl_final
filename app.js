@@ -289,7 +289,7 @@ function submitQuiz() {
         <div class="label">参考答案：</div>
         <div>${formatAnswer(q.answer)}</div>
         <div class="label" style="margin-top:6px">解析：</div>
-        <pre>${escapeHtml(q.explain)}</pre>
+        <div class="explain-text">${formatExplain(q.explain)}</div>
         ${q.type === "subjective" ? renderSelfGrade(q) : ""}
       </div>
     `;
@@ -361,6 +361,10 @@ function formatAnswer(a) {
   if (typeof a === "boolean") return a ? "正确" : "错误";
   if (Array.isArray(a)) return a.join(", ") + "（多选索引）";
   return escapeHtml(String(a));
+}
+
+function formatExplain(text) {
+  return escapeHtml(String(text));
 }
 
 /* ---------- 历史成绩 ---------- */
@@ -437,7 +441,7 @@ views.review = () => {
       <div class="explanation" style="display:none">
         <div class="label">参考答案：</div><div>${formatAnswer(w.q.answer)}</div>
         <div class="label" style="margin-top:6px">解析：</div>
-        <pre>${escapeHtml(w.q.explain)}</pre>
+        <div class="explain-text">${formatExplain(w.q.explain)}</div>
       </div>
     `;
     app.appendChild(div);
