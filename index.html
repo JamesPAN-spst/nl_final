@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Numération et Logique — 模拟考试系统</title>
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>Numération et Logique <span class="sub">— 模拟考试系统</span></h1>
+  <nav>
+    <button id="nav-home">📚 试卷列表</button>
+    <button id="nav-stats">📊 历史成绩</button>
+    <button id="nav-review">🔁 错题重做</button>
+    <button id="nav-notes">📖 笔记速查</button>
+  </nav>
+</header>
+
+<main id="app">
+  <!-- 路由内容动态插入 -->
+</main>
+
+<footer>
+  <small>L1 Université Paris Cité · 数据来自 cours1-11 + CC1/CC2/CC3 历年真题分析</small>
+</footer>
+
+<script src="quizzes.js"></script>
+<script src="notes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
