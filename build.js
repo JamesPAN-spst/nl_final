@@ -37,10 +37,10 @@ function inferTopic(qstr) {
 }
 
 // ---- 收集旧题（去掉旧 id, 加 topic）----
-const pool = [];
+const rawPool = [];
 for (const sim of OLD) {
   for (const q of sim.questions) {
-    pool.push({
+    rawPool.push({
       type: q.type, points: q.points || 2, q: q.q,
       options: q.options, answer: q.answer, explain: q.explain || "",
       topic: q.topic || inferTopic(q.q),
@@ -64,7 +64,7 @@ for (const q of NEW) {
   } else if (q.type === "fill" || q.type === "subjective") {
     if (typeof q.answer !== "string") { dropped++; continue; }
   } else { dropped++; continue; }
-  pool.push({
+  rawPool.push({
     type: q.type, points: q.points || 2, q: q.q,
     options: q.options, answer: q.answer, explain: q.explain || "",
     topic: q.topic || inferTopic(q.q),
@@ -72,7 +72,33 @@ for (const q of NEW) {
   });
 }
 
-console.log(`总池: ${pool.length} 题 (旧+新), 丢弃 ${dropped} 道格式错误的新题`);
+function questionKey(q) {
+  return String(q.q || "").replace(/\s+/g, " ").trim();
+}
+
+function shouldDropQuestion(q) {
+  const text = `${q.q || ""}\n${q.answer || ""}\n${q.explain || ""}`;
+  const prompt = String(q.q || "");
+  if (/^\s*续上/.test(prompt)) return true;
+  if (/⚠️.*4x\s*\\equiv\s*8/.test(prompt)) return true;
+  if (/\$53\.82\$\s*既约分数/.test(prompt)) return true;
+  if (/CRT[：:]/.test(prompt)) return true;
+  if (/素数无穷多|模 \$17\$ 的阶|\\text\{lcm\}|欧拉函数 \$\\varphi\(30\)|\$3\^\{2024\}|从 3 个密文恢复/.test(text)) return true;
+  return false;
+}
+
+let filtered = 0, deduped = 0;
+const pool = [];
+const seen = new Set();
+for (const q of rawPool.sort((a, b) => (a._src === "new" ? 0 : 1) - (b._src === "new" ? 0 : 1))) {
+  if (shouldDropQuestion(q)) { filtered++; continue; }
+  const key = questionKey(q);
+  if (!key || seen.has(key)) { deduped++; continue; }
+  seen.add(key);
+  pool.push(q);
+}
+
+console.log(`总池: ${pool.length} 题可用 (原始 ${rawPool.length}, 丢弃格式错误 ${dropped}, 过滤 ${filtered}, 去重 ${deduped})`);
 
 // ---- 按主题桶 ----
 const buckets = {};
@@ -96,36 +122,54 @@ function shuffle(arr, seed) {
   return a;
 }
 
-// 每个 bucket 内打乱
+// 每个 bucket 内打乱；同题型优先使用人工整理的新题，再用旧题补足。
 const topics = Object.keys(buckets).sort();
-for (const t of topics) buckets[t] = shuffle(buckets[t], t.charCodeAt(0) * 31 + t.length);
+for (const t of topics) {
+  const mixed = shuffle(buckets[t], t.charCodeAt(0) * 31 + t.length);
+  buckets[t] = mixed.filter(q => q._src === "new").concat(mixed.filter(q => q._src !== "new"));
+}
 
-// ---- 分配：15 套 × 20 题，主题轮转保证均衡 ----
+// ---- 分配：15 套 × 20 题，按 CC3 方法能力配比 ----
 const NUM_SIMS = 15, PER_SIM = 20;
 const sims = Array.from({ length: NUM_SIMS }, () => []);
-
-// 全局 round-robin：把所有题一道道分到 sim[0..14]，按主题轮转挑题
-const flatten = [];
-let cursor = 0;
 const idxByTopic = Object.fromEntries(topics.map(t => [t, 0]));
-const totalNeeded = NUM_SIMS * PER_SIM;
-while (flatten.length < totalNeeded) {
-  const t = topics[cursor % topics.length]; cursor++;
-  if (idxByTopic[t] < buckets[t].length) {
-    flatten.push(buckets[t][idxByTopic[t]++]);
-  }
-  // 若所有桶耗尽，跳出
-  if (topics.every(tt => idxByTopic[tt] >= buckets[tt].length)) break;
-}
-console.log(`分配前题数: ${flatten.length}, 需要: ${totalNeeded}`);
 
-// 分配到 sim：用"蛇形"使难度更均衡
-let simIdx = 0, dir = 1;
-for (let k = 0; k < flatten.length; k++) {
-  sims[simIdx].push(flatten[k]);
-  simIdx += dir;
-  if (simIdx === NUM_SIMS) { simIdx = NUM_SIMS - 1; dir = -1; }
-  else if (simIdx === -1) { simIdx = 0; dir = 1; }
+const TOPIC_PLAN = [
+  "base", "base",
+  "ca2", "ca2",
+  "float", "float",
+  "boolean", "boolean", "boolean", "boolean",
+  "beth", "beth",
+  "karnaugh", "karnaugh",
+  "rsa", "rsa", "rsa",
+  "modular", "modular", "modular",
+];
+const FALLBACK_TOPICS = ["boolean", "beth", "karnaugh", "rsa", "modular", "base", "ca2", "float", "numtheory"];
+
+function takeFromTopic(topic) {
+  const bucket = buckets[topic];
+  if (!bucket) return null;
+  const idx = idxByTopic[topic] || 0;
+  if (idx >= bucket.length) return null;
+  idxByTopic[topic] = idx + 1;
+  return bucket[idx];
+}
+
+function takeFallback(preferredTopic) {
+  const order = [preferredTopic].concat(FALLBACK_TOPICS.filter(t => t !== preferredTopic));
+  for (const topic of order) {
+    const q = takeFromTopic(topic);
+    if (q) return q;
+  }
+  return null;
+}
+
+for (let i = 0; i < NUM_SIMS; i++) {
+  const plan = shuffle(TOPIC_PLAN, 20260503 + i * 101);
+  for (const topic of plan) {
+    const q = takeFromTopic(topic) || takeFallback(topic);
+    if (q) sims[i].push(q);
+  }
 }
 
 // 每个 sim 内打乱顺序，保证体验
@@ -194,5 +238,5 @@ console.log("✓ quizzes.js 已生成");
 // 验证
 const ctx3 = {};
 vm.createContext(ctx3);
-vm.runInContext(out.join("\n"), ctx3);
+vm.runInContext(out.join("\n") + "\nthis.QUIZZES = QUIZZES;", ctx3);
 console.log("✓ 校验通过：", ctx3.QUIZZES.length, "套，", ctx3.QUIZZES.reduce((s, q) => s + q.questions.length, 0), "题");
